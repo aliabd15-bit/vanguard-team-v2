@@ -22,8 +22,26 @@ document.querySelectorAll('[data-go]').forEach(b=>b.addEventListener('click',()=
 $('loginBtn').onclick=async()=>{ $('loginMsg').textContent='در حال ورود…';try{await signInWithEmailAndPassword(auth,$('email').value.trim(),$('password').value)}catch(e){$('loginMsg').textContent=errorFa(e)}};
 function errorFa(e){return ({'auth/invalid-credential':'ایمیل یا رمز عبور درست نیست.','auth/too-many-requests':'تعداد تلاش‌ها زیاد بوده؛ کمی بعد دوباره امتحان کنید.','auth/network-request-failed':'اتصال اینترنت را بررسی کنید.'})[e.code]||'ورود انجام نشد: '+e.message}
 onAuthStateChanged(auth,async user=>{if(!user){$('login').classList.remove('hidden');$('app').classList.add('hidden');$('nav').classList.add('hidden');return}
-try{const u=await getDoc(doc(db,'users',user.uid));if(!u.exists()||u.data().role!=='admin'||u.data().active!==true){await signOut(auth);$('loginMsg').textContent='این حساب مجوز مدیر اصلی ندارد.';return}
-$('login').classList.add('hidden');$('app').classList.remove('hidden');$('nav').classList.remove('hidden');$('connection').textContent='متصل به Firebase';await loadAll()
+try{
+ const userRef=doc(db,'users',user.uid);
+ const u=await getDoc(userRef);
+ const data=u.exists()?u.data():{};
+ const roleValue=data.role;
+ const activeValue=data.active;
+ if(!u.exists()||roleValue!=='admin'||activeValue!==true){
+  const diagnostic=[
+   'گزارش بررسی دسترسی:',
+   'UID ورود: '+user.uid,
+   'Project ID: '+firebaseConfig.projectId,
+   'سند users پیدا شد: '+u.exists(),
+   'role: '+(roleValue===undefined?'(وجود ندارد)':JSON.stringify(roleValue))+' | نوع: '+typeof roleValue,
+   'active: '+(activeValue===undefined?'(وجود ندارد)':JSON.stringify(activeValue))+' | نوع: '+typeof activeValue
+  ].join('\n');
+  $('loginMsg').textContent=diagnostic;
+  await signOut(auth);
+  return
+ }
+ $('login').classList.add('hidden');$('app').classList.remove('hidden');$('nav').classList.remove('hidden');$('connection').textContent='متصل به Firebase';await loadAll()
 }catch(e){$('loginMsg').textContent='خطا در بررسی مجوز: '+e.message;await signOut(auth)}});
 $('logout').onclick=()=>signOut(auth);$('refresh').onclick=loadAll;
 async function loadAll(){try{let [m,t,g]=await Promise.all([getDocs(collection(db,'members')),getDocs(collection(db,'tasks')),getDocs(collection(db,'growth'))]);members=m.docs.map(d=>({id:d.id,...d.data()}));tasks=t.docs.map(d=>({id:d.id,...d.data()}));growth=g.docs.map(d=>({id:d.id,...d.data()}));render();$('connection').textContent='متصل و همگام‌سازی‌شده'}catch(e){toast('خطا در دریافت داده‌ها: '+e.message);$('connection').textContent='خطا در اتصال'}}
